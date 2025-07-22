@@ -38,7 +38,7 @@ public:
 
   ConfigLoader();
 
-  ~ConfigLoader();
+  virtual ~ConfigLoader();
 
   // For a line like
   // entity animals/dog
