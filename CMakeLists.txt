@@ -143,6 +143,7 @@ gz_find_package(gz-sensors8 REQUIRED VERSION 8.2.0
     air_pressure
     air_speed
     altimeter
+    cpu_lidar
     imu
     force_torque
     logical_camera
