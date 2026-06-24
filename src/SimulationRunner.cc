@@ -996,7 +996,7 @@ bool SimulationRunner::Run(const uint64_t _iterations)
 
       // Threshold at which we switch from sleeping to spinning. This should be
       // larger than the typical OS + CPU C-state latency.
-      constexpr auto kSpinThreshold = 200us;
+      constexpr auto kSpinThreshold = 00us;
 
       auto now = std::chrono::steady_clock::now();
 
@@ -1039,11 +1039,6 @@ bool SimulationRunner::Run(const uint64_t _iterations)
 #endif
         }
 
-        // ...then busy-wait for the final moments for precision.
-        while (std::chrono::steady_clock::now() < nextUpdateTime)
-        {
-          // Spin.
-        }
       }
 
       // Schedule the next update time.
