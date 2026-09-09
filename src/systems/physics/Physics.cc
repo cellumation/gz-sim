@@ -1664,177 +1664,25 @@ void PhysicsPrivate::CreateCollisionEntities(const EntityComponentManager &_ecm,
         auto collideBitmask = collision.Surface()->Contact()->CollideBitmask();
 
         ShapePtrType collisionPtrPhys;
-        if (_geom->Data().Type() == sdf::GeometryType::MESH)
+        auto linkCollisionFeature =
+            this->entityLinkMap.EntityCast<CollisionFeatureList>(
+                _parent->Data());
+        if (!linkCollisionFeature)
         {
-          const sdf::Mesh *meshSdf = _geom->Data().MeshShape();
-          if (nullptr == meshSdf)
+          static bool informed{false};
+          if (!informed)
           {
-            gzwarn << "Mesh geometry for collision [" << _name->Data()
-                    << "] missing mesh shape." << std::endl;
-            return true;
+            gzdbg << "Attempting to process collisions, but the physics "
+                   << "engine doesn't support feature "
+                   << "[ConstructSdfCollision]. Collisions will be ignored."
+                   << std::endl;
+            informed = true;
           }
-
-          const common::Mesh *mesh = loadMesh(*meshSdf);
-          if (!mesh)
-            return true;
-
-          auto linkMeshFeature =
-              this->entityLinkMap.EntityCast<MeshFeatureList>(_parent->Data());
-          if (!linkMeshFeature)
-          {
-            static bool informed{false};
-            if (!informed)
-            {
-              gzdbg << "Attempting to process mesh geometries, but the physics"
-                     << " engine doesn't support feature "
-                     << "[AttachMeshShapeFeature]. Meshes will be ignored."
-                     << std::endl;
-              informed = true;
-            }
-            return true;
-          }
-
-          collisionPtrPhys = linkMeshFeature->AttachMeshShape(_name->Data(),
-              *mesh,
-              math::eigen3::convert(_pose->Data()),
-              math::eigen3::convert(meshSdf->Scale()));
+          return true;
         }
-        else if (_geom->Data().Type() == sdf::GeometryType::HEIGHTMAP)
-        {
-          auto linkHeightmapFeature =
-              this->entityLinkMap.EntityCast<HeightmapFeatureList>(
-                  _parent->Data());
-          if (!linkHeightmapFeature)
-          {
-            static bool informed{false};
-            if (!informed)
-            {
-              gzdbg << "Attempting to process heightmap geometries, but the "
-                     << "physics engine doesn't support feature "
-                     << "[AttachHeightmapShapeFeature]. Heightmaps will be "
-                     << "ignored." << std::endl;
-              informed = true;
-            }
-            return true;
-          }
 
-          auto heightmapSdf = _geom->Data().HeightmapShape();
-          if (nullptr == heightmapSdf)
-          {
-            gzwarn << "Heightmap geometry for collision [" << _name->Data()
-                    << "] missing heightmap shape." << std::endl;
-            return true;
-          }
-
-          auto fullPath = common::findFile(asFullPath(heightmapSdf->Uri(),
-              heightmapSdf->FilePath()));
-          if (fullPath.empty())
-          {
-            gzerr << "Heightmap geometry missing URI" << std::endl;
-            return true;
-          }
-
-          std::shared_ptr<common::HeightmapData> data;
-          // check if heightmap is an image
-          if (common::isSupportedImageHeightmapFileExtension(fullPath))
-          {
-            data = common::loadHeightmapData(fullPath);
-            if (!data)
-              return true;
-          }
-          // DEM
-          else
-          {
-            auto worldEntity = _ecm.EntityByComponents(components::World());
-            auto sphericalCoordinatesComponent =
-              _ecm.Component<components::SphericalCoordinates>(
-                worldEntity);
-            math::SphericalCoordinates sphericalCoordinates;
-            if (sphericalCoordinatesComponent)
-              sphericalCoordinates = sphericalCoordinatesComponent->Data();
-            data = common::loadHeightmapData(fullPath, sphericalCoordinates);
-            if (!data)
-              return true;
-          }
-
-          collisionPtrPhys = linkHeightmapFeature->AttachHeightmapShape(
-              _name->Data(),
-              *data,
-              math::eigen3::convert(_pose->Data()),
-              math::eigen3::convert(heightmapSdf->Size()),
-              heightmapSdf->Sampling());
-        }
-        else if (_geom->Data().Type() == sdf::GeometryType::POLYLINE)
-        {
-          auto polylineSdf = _geom->Data().PolylineShape();
-          if (polylineSdf.empty())
-          {
-            gzwarn << "Polyline geometry for collision [" << _name->Data()
-                    << "] missing polylines." << std::endl;
-            return true;
-          }
-
-          std::vector<std::vector<math::Vector2d>> vertices;
-          for (const auto &polyline : _geom->Data().PolylineShape())
-          {
-            vertices.push_back(polyline.Points());
-          }
-
-          std::string name("POLYLINE_" + common::Uuid().String());
-          auto meshManager = common::MeshManager::Instance();
-          meshManager->CreateExtrudedPolyline(name, vertices,
-              _geom->Data().PolylineShape()[0].Height());
-
-          auto polyline = meshManager->MeshByName(name);
-          if (nullptr == polyline)
-          {
-            gzwarn << "Failed to create polyline for collision ["
-                    << _name->Data() << "]." << std::endl;
-            return true;
-          }
-
-          auto linkMeshFeature =
-              this->entityLinkMap.EntityCast<MeshFeatureList>(_parent->Data());
-          if (!linkMeshFeature)
-          {
-            static bool informed{false};
-            if (!informed)
-            {
-              gzdbg << "Attempting to process polyline geometries, but the"
-                     << " physics engine doesn't support feature "
-                     << "[AttachMeshShapeFeature]. Polylines will be ignored."
-                     << std::endl;
-              informed = true;
-            }
-            return true;
-          }
-
-          collisionPtrPhys = linkMeshFeature->AttachMeshShape(_name->Data(),
-              *polyline,
-              math::eigen3::convert(_pose->Data()));
-        }
-        else
-        {
-          auto linkCollisionFeature =
-              this->entityLinkMap.EntityCast<CollisionFeatureList>(
-                  _parent->Data());
-          if (!linkCollisionFeature)
-          {
-            static bool informed{false};
-            if (!informed)
-            {
-              gzdbg << "Attempting to process collisions, but the physics "
-                     << "engine doesn't support feature "
-                     << "[ConstructSdfCollision]. Collisions will be ignored."
-                     << std::endl;
-              informed = true;
-            }
-            return true;
-          }
-
-          collisionPtrPhys =
-              linkCollisionFeature->ConstructCollision(collision);
-        }
+        collisionPtrPhys =
+            linkCollisionFeature->ConstructCollision(collision);
 
         if (nullptr == collisionPtrPhys)
         {
